@@ -12,10 +12,9 @@ from ant.core.constants import CHANNEL_TYPE_TWOWAY_RECEIVE, TIMEOUT_NEVER
 
 class HRM(event.EventCallback):
 
-    def __init__(self, serial, netkey, logfile=log.LogWriter('log.txt')):
+    def __init__(self, serial, netkey):
         self.serial = serial
         self.netkey = netkey
-        self.log = logfile
         self.antnode = None
         self.channel = None
 
@@ -61,7 +60,6 @@ class HRM(event.EventCallback):
             print("heart rate is {}".format(ord(msg.payload[-1])))
 
 SERIAL = '/dev/ttyUSB0'
-DEBUG = True
 NETKEY = 'B9A521FBBD72C345'.decode('hex')
 
 with HRM(serial=SERIAL, netkey=NETKEY) as hrm:
