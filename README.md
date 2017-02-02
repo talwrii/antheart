@@ -16,6 +16,6 @@ antheart target 90 # Keep your heart rate near 90, warn if it differs largely
 
 # Bugs
 
-I've managed to get this to temporarily break my ant+ interface before (Resource busy)
-This was fixed by unplugging my dongle and plugging in again. Bad luck if you don't have a dongle... 
-because you'll probably have to restart your computer...
+I've managed to get this to temporarily break my ant+ interface before (Resource busy).
+This was fixed by unplugging my dongle and plugging in again. 
+Bad luck if you don't have a dongle: because you'll probably have to restart your computer.
