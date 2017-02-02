@@ -15,9 +15,15 @@ def build_parser():
     parsers = PARSER.add_subparsers(dest='command')
     target_parser = parsers.add_parser('target', help='')
     target_parser.add_argument('rate', type=float, help='Target this rate')
+    thresh_mx = target_parser.add_mutually_exclusive_group()
+
+    thresh_mx.add_argument('--above', action='store_true', help='Heart rate must be above rate')
+    thresh_mx.add_argument('--below', action='store_true', help='Heart rate must be below rate')
+    thresh_mx.add_argument('--threshold', type=float, help='Number of beats either way to accept', default=5)
+
     target_parser.add_argument('--threshold-seconds', type=float, help='How long to wait before warning', default=5)
-    target_parser.add_argument('--threshold', type=float, help='Number of beats either way to accept', default=5)
     target_parser.add_argument('--warn-period', type=float, help='Rewarn after delay', default=5)
+
     return PARSER
 
 
@@ -28,8 +34,13 @@ def main():
         logging.basicConfig(level=logging.DEBUG)
 
     if args.command == 'target':
-        lower_rate = args.rate - args.threshold
-        upper_rate = args.rate + args.threshold
+        if args.above:
+            lower_rate, upper_rate = args.rate, None
+        elif args.below:
+            lower_rate, upper_rate = None, args.rate, 
+        else:
+            lower_rate = args.rate - args.threshold
+            upper_rate = args.rate + args.threshold
 
         target_heart_rate(lower_rate, upper_rate, args.threshold_seconds, args.warn_period)
     else:
@@ -72,7 +83,6 @@ def limit_detector(lower_rate, upper_rate, threshold_seconds):
     limit_start = None
     rate = yield None, None
     while True:
-
         if lower_rate and rate < lower_rate:
             if limit_start is None:
                 limit_start = time.time()
