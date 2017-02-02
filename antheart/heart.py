@@ -5,30 +5,50 @@
         https://github.com/tomwardill/developerhealth
     by Tom Wardill
 """
+import contextlib
 import logging
 import Queue
-import sys
-import time
+import threading
 
-from ant.core import driver, event, log, message, node
+from ant.core import driver, event, message, node
 from ant.core.constants import CHANNEL_TYPE_TWOWAY_RECEIVE, TIMEOUT_NEVER
 
-LOGGER = logging.getLogger()
+LOGGER = logging.getLogger('heart')
 
+SERIAL = '/dev/ttyUSB0'
+NETKEY = 'B9A521FBBD72C345'.decode('hex')
 
-LOGGER.debug('')
+@contextlib.contextmanager
+def with_heart_rate_queue():
+    "Return a queue object that gives heart rates"
+    with HeartRateMonitor(serial=SERIAL, netkey=NETKEY) as hrm:
+        q = Queue.Queue()
+        hrm.start(callback=q.put)
+        try:
+            yield q
+        finally:
+            hrm.stop()
 
+def heart_rate_stream():
+    "Iterator of heart rates"
+    with with_heart_rate_queue() as q:
+        yield q.get()
 
-class HRM(event.EventCallback):
-    def __init__(self, serial, netkey, callback=None):
+class HeartRateMonitor(event.EventCallback):
+    # Adapted from J Bader code sample (see README.md)
+    def __init__(self, serial, netkey):
         self.serial = serial
         self.netkey = netkey
         self.antnode = None
         self.channel = None
-        self.callback = callback
+        self.callback = None
+        self.lock = threading.RLock()
 
-    def start(self):
+    def start(self, callback=None):
         LOGGER.debug("starting node")
+        if callback:
+            self._set_callback(callback)
+
         self._start_antnode()
         self._setup_channel()
         self.channel.registerCallback(self)
@@ -66,20 +86,15 @@ class HRM(event.EventCallback):
         self.channel.open()
 
     def process(self, msg):
-        if isinstance(msg, message.ChannelBroadcastDataMessage):
-            heart_rate = ord(msg.payload[-1])
-            if self.callback:
-                self.callback(heart_rate)
-            else:
-                print('Heart rate is {}'.format(heart_rate))
+        with self.lock:
+            if isinstance(msg, message.ChannelBroadcastDataMessage):
+                heart_rate = ord(msg.payload[-1])
+                LOGGER.debug('Read heart rate: %r', heart_rate)
+                if self.callback:
+                    self.callback(heart_rate)
+                else:
+                    print('Heart rate is {}'.format(heart_rate))
 
-SERIAL = '/dev/ttyUSB0'
-NETKEY = 'B9A521FBBD72C345'.decode('hex')
-
-def heart_rate_stream():
-    q = Queue.Queue()
-    with HRM(serial=SERIAL, netkey=NETKEY, callback=q.put) as hrm:
-        hrm.start()
-        while True:
-            rate = q.get()
-            yield rate
+    def _set_callback(self, callback):
+        with self.lock:
+            self.callback = callback
