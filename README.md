@@ -1,6 +1,6 @@
 # heart-target
 
-Various utilities related to heart rate. Early development
+Various high-level command line utilities for interacting with ant heart rate monitors.
 
 # Prior work
 
