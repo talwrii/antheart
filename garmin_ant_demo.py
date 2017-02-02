@@ -5,25 +5,34 @@
         https://github.com/tomwardill/developerhealth
     by Tom Wardill
 """
+import logging
+import Queue
 import sys
 import time
-from ant.core import driver, node, event, message, log
+
+from ant.core import driver, event, log, message, node
 from ant.core.constants import CHANNEL_TYPE_TWOWAY_RECEIVE, TIMEOUT_NEVER
 
-class HRM(event.EventCallback):
+LOGGER = logging.getLogger()
 
-    def __init__(self, serial, netkey):
+
+LOGGER.debug('')
+
+
+class HRM(event.EventCallback):
+    def __init__(self, serial, netkey, callback=None):
         self.serial = serial
         self.netkey = netkey
         self.antnode = None
         self.channel = None
+        self.callback = callback
 
     def start(self):
-        print("starting node")
+        LOGGER.debug("starting node")
         self._start_antnode()
         self._setup_channel()
         self.channel.registerCallback(self)
-        print("start listening for hr events")
+        LOGGER.debug("start listening for hr events")
 
     def stop(self):
         if self.channel:
@@ -36,7 +45,8 @@ class HRM(event.EventCallback):
         return self
 
     def __exit__(self, type_, value, traceback):
-        self.stop()
+        if self.antnode and self.antnode.running:
+            self.stop()
 
     def _start_antnode(self):
         stick = driver.USB2Driver(self.serial)
@@ -57,15 +67,19 @@ class HRM(event.EventCallback):
 
     def process(self, msg):
         if isinstance(msg, message.ChannelBroadcastDataMessage):
-            print("heart rate is {}".format(ord(msg.payload[-1])))
+            heart_rate = ord(msg.payload[-1])
+            if self.callback:
+                self.callback(heart_rate)
+            else:
+                print('Heart rate is {}'.format(heart_rate))
 
 SERIAL = '/dev/ttyUSB0'
 NETKEY = 'B9A521FBBD72C345'.decode('hex')
 
-with HRM(serial=SERIAL, netkey=NETKEY) as hrm:
-    hrm.start()
-    while True:
-        try:
-            time.sleep(1)
-        except KeyboardInterrupt:
-            sys.exit(0)
+def heart_rate_stream():
+    q = Queue.Queue()
+    with HRM(serial=SERIAL, netkey=NETKEY, callback=q.put) as hrm:
+        hrm.start()
+        while True:
+            rate = q.get()
+            yield rate
